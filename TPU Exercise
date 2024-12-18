@@ -1,0 +1,535 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "46a22a70",
+   "metadata": {
+    "papermill": {
+     "duration": 0.004483,
+     "end_time": "2024-12-18T08:39:06.899587",
+     "exception": false,
+     "start_time": "2024-12-18T08:39:06.895104",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "# A Simple TF 2.1 notebook\n",
+    "\n",
+    "This is based entirely off of Martin Gorner's excellent starter notebook, and is intended solely as a simple, shorter introduction to the operations being performed there."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "d6393c3a",
+   "metadata": {
+    "_cell_guid": "b1076dfc-b9ad-4769-8c92-a6c4dae69d19",
+    "_uuid": "8f2839f25d086af736a60e9eeb907d3b93b6e0e5",
+    "execution": {
+     "iopub.execute_input": "2024-12-18T08:39:06.908136Z",
+     "iopub.status.busy": "2024-12-18T08:39:06.907643Z",
+     "iopub.status.idle": "2024-12-18T08:39:13.268054Z",
+     "shell.execute_reply": "2024-12-18T08:39:13.266873Z"
+    },
+    "papermill": {
+     "duration": 6.367636,
+     "end_time": "2024-12-18T08:39:13.270598",
+     "exception": false,
+     "start_time": "2024-12-18T08:39:06.902962",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Tensorflow version 2.6.4\n"
+     ]
+    }
+   ],
+   "source": [
+    "import tensorflow as tf\n",
+    "from kaggle_datasets import KaggleDatasets\n",
+    "import numpy as np\n",
+    "\n",
+    "print(\"Tensorflow version \" + tf.__version__)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "ea33939a",
+   "metadata": {
+    "papermill": {
+     "duration": 0.003012,
+     "end_time": "2024-12-18T08:39:13.277454",
+     "exception": false,
+     "start_time": "2024-12-18T08:39:13.274442",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "# Detect my accelerator"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "f605fab8",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-18T08:39:13.286137Z",
+     "iopub.status.busy": "2024-12-18T08:39:13.285480Z",
+     "iopub.status.idle": "2024-12-18T08:39:13.300650Z",
+     "shell.execute_reply": "2024-12-18T08:39:13.299245Z"
+    },
+    "papermill": {
+     "duration": 0.022444,
+     "end_time": "2024-12-18T08:39:13.303182",
+     "exception": false,
+     "start_time": "2024-12-18T08:39:13.280738",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "REPLICAS:  1\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Detect hardware, return appropriate distribution strategy\n",
+    "try:\n",
+    "    tpu = tf.distribute.cluster_resolver.TPUClusterResolver()  # TPU detection. No parameters necessary if TPU_NAME environment variable is set. On Kaggle this is always the case.\n",
+    "    print('Running on TPU ', tpu.master())\n",
+    "except ValueError:\n",
+    "    tpu = None\n",
+    "\n",
+    "if tpu:\n",
+    "    tf.config.experimental_connect_to_cluster(tpu)\n",
+    "    tf.tpu.experimental.initialize_tpu_system(tpu)\n",
+    "    strategy = tf.distribute.experimental.TPUStrategy(tpu)\n",
+    "else:\n",
+    "    strategy = tf.distribute.get_strategy() # default distribution strategy in Tensorflow. Works on CPU and single GPU.\n",
+    "\n",
+    "print(\"REPLICAS: \", strategy.num_replicas_in_sync)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "5ce85e8c",
+   "metadata": {
+    "papermill": {
+     "duration": 0.003701,
+     "end_time": "2024-12-18T08:39:13.310800",
+     "exception": false,
+     "start_time": "2024-12-18T08:39:13.307099",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "# Get my data path"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "f34f1207",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-18T08:39:13.319656Z",
+     "iopub.status.busy": "2024-12-18T08:39:13.319243Z",
+     "iopub.status.idle": "2024-12-18T08:39:13.701332Z",
+     "shell.execute_reply": "2024-12-18T08:39:13.700054Z"
+    },
+    "papermill": {
+     "duration": 0.390136,
+     "end_time": "2024-12-18T08:39:13.704541",
+     "exception": false,
+     "start_time": "2024-12-18T08:39:13.314405",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "GCS_DS_PATH = KaggleDatasets().get_gcs_path() # you can list the bucket with \"!gsutil ls $GCS_DS_PATH\""
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "ce55463c",
+   "metadata": {
+    "papermill": {
+     "duration": 0.00323,
+     "end_time": "2024-12-18T08:39:13.711631",
+     "exception": false,
+     "start_time": "2024-12-18T08:39:13.708401",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "# Set some parameters"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "a4c80de2",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-18T08:39:13.720304Z",
+     "iopub.status.busy": "2024-12-18T08:39:13.719882Z",
+     "iopub.status.idle": "2024-12-18T08:39:13.726502Z",
+     "shell.execute_reply": "2024-12-18T08:39:13.725159Z"
+    },
+    "papermill": {
+     "duration": 0.013684,
+     "end_time": "2024-12-18T08:39:13.728898",
+     "exception": false,
+     "start_time": "2024-12-18T08:39:13.715214",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "IMAGE_SIZE = [192, 192] # at this size, a GPU will run out of memory. Use the TPU\n",
+    "EPOCHS = 5\n",
+    "BATCH_SIZE = 16 * strategy.num_replicas_in_sync\n",
+    "\n",
+    "NUM_TRAINING_IMAGES = 12753\n",
+    "NUM_TEST_IMAGES = 7382\n",
+    "STEPS_PER_EPOCH = NUM_TRAINING_IMAGES // BATCH_SIZE\n",
+    "AUTO = tf.data.experimental.AUTOTUNE"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "6e6f0c5d",
+   "metadata": {
+    "papermill": {
+     "duration": 0.003151,
+     "end_time": "2024-12-18T08:39:13.735701",
+     "exception": false,
+     "start_time": "2024-12-18T08:39:13.732550",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "# Load my data\n",
+    "\n",
+    "This data is loaded from Kaggle and automatically sharded to maximize parallelization."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "8ea09c36",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-18T08:39:13.745317Z",
+     "iopub.status.busy": "2024-12-18T08:39:13.744202Z",
+     "iopub.status.idle": "2024-12-18T08:39:15.680704Z",
+     "shell.execute_reply": "2024-12-18T08:39:15.679123Z"
+    },
+    "papermill": {
+     "duration": 1.944828,
+     "end_time": "2024-12-18T08:39:15.684082",
+     "exception": false,
+     "start_time": "2024-12-18T08:39:13.739254",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "def decode_image(image_data):\n",
+    "    image = tf.image.decode_jpeg(image_data, channels=3)\n",
+    "    image = tf.cast(image, tf.float32) / 255.0  # convert image to floats in [0, 1] range\n",
+    "    image = tf.reshape(image, [*IMAGE_SIZE, 3]) # explicit size needed for TPU\n",
+    "    return image\n",
+    "\n",
+    "def read_labeled_tfrecord(example):\n",
+    "    LABELED_TFREC_FORMAT = {\n",
+    "        \"image\": tf.io.FixedLenFeature([], tf.string), # tf.string means bytestring\n",
+    "        \"class\": tf.io.FixedLenFeature([], tf.int64),  # shape [] means single element\n",
+    "    }\n",
+    "    example = tf.io.parse_single_example(example, LABELED_TFREC_FORMAT)\n",
+    "    image = decode_image(example['image'])\n",
+    "    label = tf.cast(example['class'], tf.int32)\n",
+    "    return image, label # returns a dataset of (image, label) pairs\n",
+    "\n",
+    "def read_unlabeled_tfrecord(example):\n",
+    "    UNLABELED_TFREC_FORMAT = {\n",
+    "        \"image\": tf.io.FixedLenFeature([], tf.string), # tf.string means bytestring\n",
+    "        \"id\": tf.io.FixedLenFeature([], tf.string),  # shape [] means single element\n",
+    "        # class is missing, this competitions's challenge is to predict flower classes for the test dataset\n",
+    "    }\n",
+    "    example = tf.io.parse_single_example(example, UNLABELED_TFREC_FORMAT)\n",
+    "    image = decode_image(example['image'])\n",
+    "    idnum = example['id']\n",
+    "    return image, idnum # returns a dataset of image(s)\n",
+    "\n",
+    "def load_dataset(filenames, labeled=True, ordered=False):\n",
+    "    # Read from TFRecords. For optimal performance, reading from multiple files at once and\n",
+    "    # disregarding data order. Order does not matter since we will be shuffling the data anyway.\n",
+    "\n",
+    "    ignore_order = tf.data.Options()\n",
+    "    if not ordered:\n",
+    "        ignore_order.experimental_deterministic = False # disable order, increase speed\n",
+    "\n",
+    "    dataset = tf.data.TFRecordDataset(filenames, num_parallel_reads=AUTO) # automatically interleaves reads from multiple files\n",
+    "    dataset = dataset.with_options(ignore_order) # uses data as soon as it streams in, rather than in its original order\n",
+    "    dataset = dataset.map(read_labeled_tfrecord if labeled else read_unlabeled_tfrecord, num_parallel_calls=AUTO)\n",
+    "    # returns a dataset of (image, label) pairs if labeled=True or (image, id) pairs if labeled=False\n",
+    "    return dataset\n",
+    "\n",
+    "def get_training_dataset():\n",
+    "    dataset = load_dataset(tf.io.gfile.glob(GCS_DS_PATH + '/tfrecords-jpeg-192x192/train/*.tfrec'), labeled=True)\n",
+    "    dataset = dataset.repeat() # the training dataset must repeat for several epochs\n",
+    "    dataset = dataset.shuffle(2048)\n",
+    "    dataset = dataset.batch(BATCH_SIZE)\n",
+    "    dataset = dataset.prefetch(AUTO) # prefetch next batch while training (autotune prefetch buffer size)\n",
+    "    return dataset\n",
+    "\n",
+    "def get_validation_dataset():\n",
+    "    dataset = load_dataset(tf.io.gfile.glob(GCS_DS_PATH + '/tfrecords-jpeg-192x192/val/*.tfrec'), labeled=True, ordered=False)\n",
+    "    dataset = dataset.batch(BATCH_SIZE)\n",
+    "    dataset = dataset.cache()\n",
+    "    dataset = dataset.prefetch(AUTO) # prefetch next batch while training (autotune prefetch buffer size)\n",
+    "    return dataset\n",
+    "\n",
+    "def get_test_dataset(ordered=False):\n",
+    "    dataset = load_dataset(tf.io.gfile.glob(GCS_DS_PATH + '/tfrecords-jpeg-192x192/test/*.tfrec'), labeled=False, ordered=ordered)\n",
+    "    dataset = dataset.batch(BATCH_SIZE)\n",
+    "    dataset = dataset.prefetch(AUTO) # prefetch next batch while training (autotune prefetch buffer size)\n",
+    "    return dataset\n",
+    "\n",
+    "training_dataset = get_training_dataset()\n",
+    "validation_dataset = get_validation_dataset()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "dfdd90c3",
+   "metadata": {
+    "papermill": {
+     "duration": 0.005586,
+     "end_time": "2024-12-18T08:39:15.696217",
+     "exception": false,
+     "start_time": "2024-12-18T08:39:15.690631",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "# Build a model on TPU (or GPU, or CPU...) with Tensorflow 2.1!"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "ab2a4ec7",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-18T08:39:15.705455Z",
+     "iopub.status.busy": "2024-12-18T08:39:15.704918Z",
+     "iopub.status.idle": "2024-12-18T13:01:42.614196Z",
+     "shell.execute_reply": "2024-12-18T13:01:42.610019Z"
+    },
+    "papermill": {
+     "duration": 15746.919047,
+     "end_time": "2024-12-18T13:01:42.618910",
+     "exception": false,
+     "start_time": "2024-12-18T08:39:15.699863",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Downloading data from https://storage.googleapis.com/tensorflow/keras-applications/vgg16/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5\n",
+      "58892288/58889256 [==============================] - 2s 0us/step\n",
+      "58900480/58889256 [==============================] - 2s 0us/step\n",
+      "Epoch 1/5\n",
+      "797/797 [==============================] - 3133s 4s/step - loss: 3.5365 - sparse_categorical_accuracy: 0.2094 - val_loss: 3.0464 - val_sparse_categorical_accuracy: 0.3120\n",
+      "Epoch 2/5\n",
+      "797/797 [==============================] - 3125s 4s/step - loss: 2.7606 - sparse_categorical_accuracy: 0.3596 - val_loss: 2.5785 - val_sparse_categorical_accuracy: 0.3917\n",
+      "Epoch 3/5\n",
+      "797/797 [==============================] - 3148s 4s/step - loss: 2.3662 - sparse_categorical_accuracy: 0.4566 - val_loss: 2.3114 - val_sparse_categorical_accuracy: 0.4725\n",
+      "Epoch 4/5\n",
+      "797/797 [==============================] - 3178s 4s/step - loss: 2.1281 - sparse_categorical_accuracy: 0.5061 - val_loss: 2.1213 - val_sparse_categorical_accuracy: 0.5186\n",
+      "Epoch 5/5\n",
+      "797/797 [==============================] - 3141s 4s/step - loss: 1.9486 - sparse_categorical_accuracy: 0.5475 - val_loss: 1.9840 - val_sparse_categorical_accuracy: 0.5480\n"
+     ]
+    }
+   ],
+   "source": [
+    "with strategy.scope():    \n",
+    "    pretrained_model = tf.keras.applications.VGG16(weights='imagenet', include_top=False ,input_shape=[*IMAGE_SIZE, 3])\n",
+    "    pretrained_model.trainable = False # tramsfer learning\n",
+    "    \n",
+    "    model = tf.keras.Sequential([\n",
+    "        pretrained_model,\n",
+    "        tf.keras.layers.GlobalAveragePooling2D(),\n",
+    "        tf.keras.layers.Dense(104, activation='softmax')\n",
+    "    ])\n",
+    "        \n",
+    "model.compile(\n",
+    "    optimizer='adam',\n",
+    "    loss = 'sparse_categorical_crossentropy',\n",
+    "    metrics=['sparse_categorical_accuracy']\n",
+    ")\n",
+    "\n",
+    "historical = model.fit(training_dataset, \n",
+    "          steps_per_epoch=STEPS_PER_EPOCH, \n",
+    "          epochs=EPOCHS, \n",
+    "          validation_data=validation_dataset)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "54983d98",
+   "metadata": {
+    "papermill": {
+     "duration": 0.223874,
+     "end_time": "2024-12-18T13:01:43.066762",
+     "exception": false,
+     "start_time": "2024-12-18T13:01:42.842888",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "# Compute your predictions on the test set!\n",
+    "\n",
+    "This will create a file that can be submitted to the competition."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "a7564d26",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-18T13:01:43.531129Z",
+     "iopub.status.busy": "2024-12-18T13:01:43.529399Z",
+     "iopub.status.idle": "2024-12-18T13:25:15.310871Z",
+     "shell.execute_reply": "2024-12-18T13:25:15.309574Z"
+    },
+    "papermill": {
+     "duration": 1412.000887,
+     "end_time": "2024-12-18T13:25:15.313820",
+     "exception": false,
+     "start_time": "2024-12-18T13:01:43.312933",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Computing predictions...\n",
+      "[67 28 82 ... 68 94 62]\n",
+      "Generating submission.csv file...\n"
+     ]
+    }
+   ],
+   "source": [
+    "test_ds = get_test_dataset(ordered=True) # since we are splitting the dataset and iterating separately on images and ids, order matters.\n",
+    "\n",
+    "print('Computing predictions...')\n",
+    "test_images_ds = test_ds.map(lambda image, idnum: image)\n",
+    "probabilities = model.predict(test_images_ds)\n",
+    "predictions = np.argmax(probabilities, axis=-1)\n",
+    "print(predictions)\n",
+    "\n",
+    "print('Generating submission.csv file...')\n",
+    "test_ids_ds = test_ds.map(lambda image, idnum: idnum).unbatch()\n",
+    "test_ids = next(iter(test_ids_ds.batch(NUM_TEST_IMAGES))).numpy().astype('U') # all in one batch\n",
+    "np.savetxt('submission.csv', np.rec.fromarrays([test_ids, predictions]), fmt=['%s', '%d'], delimiter=',', header='id,label', comments='')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "4f1bc5e8",
+   "metadata": {
+    "papermill": {
+     "duration": 0.216483,
+     "end_time": "2024-12-18T13:25:15.740406",
+     "exception": false,
+     "start_time": "2024-12-18T13:25:15.523923",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kaggle": {
+   "accelerator": "none",
+   "dataSources": [
+    {
+     "databundleVersionId": 968043,
+     "sourceId": 18278,
+     "sourceType": "competition"
+    }
+   ],
+   "dockerImageVersionId": 30299,
+   "isGpuEnabled": false,
+   "isInternetEnabled": true,
+   "language": "python",
+   "sourceType": "notebook"
+  },
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.7.12"
+  },
+  "papermill": {
+   "default_parameters": {},
+   "duration": 17182.760641,
+   "end_time": "2024-12-18T13:25:19.694657",
+   "environment_variables": {},
+   "exception": null,
+   "input_path": "__notebook__.ipynb",
+   "output_path": "__notebook__.ipynb",
+   "parameters": {},
+   "start_time": "2024-12-18T08:38:56.934016",
+   "version": "2.3.4"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
